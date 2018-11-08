@@ -162,17 +162,19 @@
      [consumer-secret "Q0qezXAGOq130uLSQvq7g84CwP6yK4vCIoI1hRyUaFIwqNYlbe"]
      [access-token "808671618-xagI8SsSrarkJdbNXciXPIUAjA2nSjieI7lJOkJv"]
      [access-token-secret "pohTt67sUHb04Ki4q4LfeLbDP9y30mjHrABwEFPdF27Cw"]))
-
-
+;define my configurations
+(define my-configs (
+  (list (cons 'q "")
+        (cons 'count "7")
+        (cons 'geocode "1.3707295,32.3032414,200km") ;;; coordinates for uganda
+        (cons 'since "2018-11-06")
+        (cons 'until "2018-11-08"))
+  ))
   ;;pass configs as param to get-request procedure
 (define mytweets (car
   (send twitter-oauth get-request
         "https://api.twitter.com/1.1/search/tweets.json"
-        (list (cons 'q "")
-              (cons 'count "12")
-              (cons 'geocode "1.3707295,32.3032414,200km") ;;; coordinates for uganda
-              (cons 'since "2018-11-06")
-              (cons 'until "2018-11-08"))
+        my-configs
         )))
 
 (define (json-lines->json-array #:head [head #f])
@@ -204,6 +206,7 @@
   ;abstraction to extract only text value from the json tweets
 
   (define fleshout-text-value (λ (x) (list (hash-ref x 'text))))
+
   (define tweet-text
     (let ([tmp (map fleshout-text-value t)])
       (filter (λ (x) (not (string-prefix? (first x) "RT"))) tmp)))
