@@ -185,29 +185,40 @@
         (loop (add1 num) (cons record json-array)
               (read-json (current-input-port))))))
 
-(define (preprocess-text lst)
-  (map (λ (x)
+;;abstraction procedure to normalise the list
+(define (normalise-list lst)
+  (λ (x)
          (string-normalize-spaces
           (remove-punctuation
            (remove-urls
             (string-downcase x)))))
-       lst))
+    )
+
+(define (preprocess-text lst) (map normalise-list lst))
 
 (define tweets (string->jsexpr
                 (with-input-from-bytes mytweets (λ () (json-lines->json-array)))))
 
+;;define an abstraction which checks if 'statuses is a list or else returns an empty list
+(define (is-list 'statuses) (list? 'statuses) null)
 (define t (car (car
-                  (let ([tmp (map (λ (x) (list (hash-ref x 'statuses))) tweets)])
+                  (let ([tmp (map (λ (x) (list (hash-ref x is-list))) tweets)])
                     tmp))))
 
 
   ;abstraction to extract only text value from the json tweets
 
   (define fleshout-text-value (λ (x) (list (hash-ref x 'text))))
+  ;; abstraction to filter out the text
+
+(define (text-filter fleshout-text-value tmp)
+  ((filter (λ (x) (not (string-prefix? (first x) "RT"))) tmp))
+  )
+  ;;apply procedure text-filter to tweet-text
   (define tweet-text
     (let ([tmp (map fleshout-text-value t)])
-      (filter (λ (x) (not (string-prefix? (first x) "RT"))) tmp)))
-
+      text-filter
+      ))
 
 ;;; tweet-list->string abstraction enables us to extract tweets from a nested list
 ;;; to a string "pure-tweet-text". This is now ready for initial text preprocessing
@@ -215,7 +226,7 @@
   (define y "")
     (for-each (lambda(arg)
                 (set! y (string-append y " " arg)))
-              (flatten lst)
+              (flatten lst) ; flatten the list into a non-null list
     ) y)
 (define pure-tweet-text (tweet-list->string tweet-text))
 
