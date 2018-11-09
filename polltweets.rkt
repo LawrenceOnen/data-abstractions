@@ -2,12 +2,11 @@
 ;;; We'll use Racket's net/url package to obtain our text,
 ;;; data-science to process the text, and plot to visualize the
 ;;; results
-(require net/url) ;library provides utilities to parse and manipulate URIs
+(require net/url)
 (require data-science-master)
 (require plot)
 (require math)
 (require json)
-
 
 (require net/uri-codec
   web-server/stuffers/hmac-sha1
@@ -19,7 +18,8 @@
   (class object%
     (super-new)
 
-    ;; set fields for accessing tokens and secrets
+    ;; mandatory fields, must be
+    ;; set by user
     (init-field consumer-key)
     (init-field consumer-secret)
     (init-field access-token)
@@ -154,26 +154,20 @@
              (list
               (generate-auth-header "post" base-url post-data)))))))
 ;consumer key and access key
-;;consumer-key, consumer-secret, access-token and access-token-secret is a shared key
-;;since my account was blocked by twitter
-
 (define twitter-oauth (new oauth-single-user%
      [consumer-key "FNdM5Cve6zDULYGeENafpncfB"]
      [consumer-secret "Q0qezXAGOq130uLSQvq7g84CwP6yK4vCIoI1hRyUaFIwqNYlbe"]
      [access-token "808671618-xagI8SsSrarkJdbNXciXPIUAjA2nSjieI7lJOkJv"]
      [access-token-secret "pohTt67sUHb04Ki4q4LfeLbDP9y30mjHrABwEFPdF27Cw"]))
 
-
-  ;;pass configs as param to get-request procedure
-(define mytweets (car
+(define rare_tweets (car
   (send twitter-oauth get-request
         "https://api.twitter.com/1.1/search/tweets.json"
         (list (cons 'q "")
-              (cons 'count "12")
+              (cons 'count "7")
               (cons 'geocode "1.3707295,32.3032414,200km") ;;; coordinates for uganda
               (cons 'since "2018-11-06")
-              (cons 'until "2018-11-08"))
-        )))
+              (cons 'until "2018-11-08")))))
 
 (define (json-lines->json-array #:head [head #f])
   (let loop ([num 0]
@@ -185,7 +179,6 @@
         (loop (add1 num) (cons record json-array)
               (read-json (current-input-port))))))
 
-;;abstraction procedure to normalise the list
 (define (normalise-list lst)
   (λ (x)
          (string-normalize-spaces
@@ -194,31 +187,25 @@
             (string-downcase x)))))
     )
 
-(define (preprocess-text lst) (map normalise-list lst))
+(define (preprocess-text lst)(map normalise-list lst))
 
 (define tweets (string->jsexpr
-                (with-input-from-bytes mytweets (λ () (json-lines->json-array)))))
+                (with-input-from-bytes rare_tweets (λ () (json-lines->json-array)))))
 
-;;define an abstraction which checks if 'statuses is a list or else returns an empty list
-(define (is-list 'statuses) (list? 'statuses) null)
 (define t (car (car
-                  (let ([tmp (map (λ (x) (list (hash-ref x is-list))) tweets)])
+                  (let ([tmp (map (λ (x) (list (hash-ref x 'statuses))) tweets)])
                     tmp))))
 
-
-  ;abstraction to extract only text value from the json tweets
-
+;abstraction to extract only text value from the json tweets
   (define fleshout-text-value (λ (x) (list (hash-ref x 'text))))
-  ;; abstraction to filter out the text
+;abstraction to filter
+(define filter-text (λ (x) (not (string-prefix? (first x) "RT"))))
 
-(define (text-filter fleshout-text-value tmp)
-  ((filter (λ (x) (not (string-prefix? (first x) "RT"))) tmp))
-  )
-  ;;apply procedure text-filter to tweet-text
+;;; Remove just the tweet text from each tweet hash and also filter out retweets.
   (define tweet-text
     (let ([tmp (map fleshout-text-value t)])
-      text-filter
-      ))
+      (filter filter-text tmp)))
+
 
 ;;; tweet-list->string abstraction enables us to extract tweets from a nested list
 ;;; to a string "pure-tweet-text". This is now ready for initial text preprocessing
@@ -226,7 +213,7 @@
   (define y "")
     (for-each (lambda(arg)
                 (set! y (string-append y " " arg)))
-              (flatten lst) ; flatten the list into a non-null list
+              (flatten lst)
     ) y)
 (define pure-tweet-text (tweet-list->string tweet-text))
 
